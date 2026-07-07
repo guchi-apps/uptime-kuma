@@ -8,7 +8,31 @@
 - **公開URL**: https://uptime-kuma-jqud.onrender.com/
 - **稼働バージョン**: v1.23.17（`louislam/uptime-kuma:1` タグが指す1.x系最終版。フロントエンドのバンドルファイルから確認）
 - 無料プランは15分間アクセスがないとスリープするため、[UptimeRobot](https://uptimerobot.com/) で5分間隔の keep-alive 監視を設定済み
-- 無料プランは永続ディスクが使えず、再起動・再デプロイでデータが消える可能性がある（未対応。[issue #1](https://github.com/m-guchi/uptime-kuma/issues/1) 参照）
+- 無料プランは永続ディスクが使えず、再起動・再デプロイでデータが消える可能性がある。VPSへの定期バックアップで対応済み（[issue #1](https://github.com/m-guchi/uptime-kuma/issues/1) 参照、詳細は下記「VPSへの定期バックアップ」）
+
+## VPSへの定期バックアップ
+
+Render無料プランは永続ディスクが無いため、コンテナ内の軽量なループ（`docker/backup-push.sh`）がUptime Kuma本体とは別プロセスとして動き、起動直後 + 以後24時間ごとにSQLiteデータベースをVPSへ push する。
+
+```
+Uptime Kuma コンテナ
+  ├─ 本来のUptime Kumaプロセス（無変更）
+  └─ backup-push.sh（追加の軽量ループ）
+       sqlite3 .backup で安全にスナップショットを取得
+       → curl で https://gucchii.com/internal/uptime-kuma-backup へPOST（Bearerトークン認証）
+```
+
+VPS側（`m-guchi/vps` リポジトリの `uptime-kuma-backup-receiver.js`）が受け取り、`/var/backups/uptime-kuma/` に保存（7日保持）し、Signalyへ成功/失敗を通知する。
+
+### Renderで設定が必要な環境変数
+
+| 変数 | 内容 |
+|------|------|
+| `BACKUP_UPLOAD_URL` | バックアップ送信先URL（例: `https://gucchii.com/internal/uptime-kuma-backup`） |
+| `BACKUP_UPLOAD_TOKEN` | VPS側の受け口と共有する認証トークン |
+| `BACKUP_INTERVAL_SECONDS` | 任意。バックアップ間隔（秒）。未設定時は86400（24時間） |
+
+いずれか未設定の場合、バックアップ処理はスキップされる（本体の動作には影響しない）。
 
 ## 使い方
 
