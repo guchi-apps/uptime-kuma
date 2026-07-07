@@ -22,13 +22,21 @@ do_backup() {
         return 0
     fi
 
-    if curl -fsS -X POST --max-time 60 \
+    response="$(curl -sS -X POST --max-time 60 \
         -H "Authorization: Bearer $BACKUP_UPLOAD_TOKEN" \
         --data-binary "@$tmpfile" \
-        "$BACKUP_UPLOAD_URL" > /dev/null; then
+        -w '\n%{http_code}' \
+        "$BACKUP_UPLOAD_URL" 2>&1)"
+    curl_exit=$?
+    http_code="$(printf '%s\n' "$response" | tail -n1)"
+    body="$(printf '%s\n' "$response" | sed '$d')"
+
+    if [ "$curl_exit" -ne 0 ]; then
+        echo "[backup-push] アップロード失敗（curl exit=$curl_exit）: $body"
+    elif [ "$http_code" = "200" ]; then
         echo "[backup-push] アップロード成功: $(date -Is)"
     else
-        echo "[backup-push] アップロード失敗: $(date -Is)"
+        echo "[backup-push] アップロード失敗（HTTP $http_code）: $body"
     fi
 
     rm -f "$tmpfile"
