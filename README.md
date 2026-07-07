@@ -10,19 +10,24 @@
 - 無料プランは15分間アクセスがないとスリープするため、[UptimeRobot](https://uptimerobot.com/) で5分間隔の keep-alive 監視を設定済み
 - 無料プランは永続ディスクが使えず、再起動・再デプロイでデータが消える可能性がある。VPSへの定期バックアップで対応済み（[issue #1](https://github.com/m-guchi/uptime-kuma/issues/1) 参照、詳細は下記「VPSへの定期バックアップ」）
 
-## VPSへの定期バックアップ
+## VPSへの定期バックアップ・起動時の自動復元
 
-Render無料プランは永続ディスクが無いため、コンテナ内の軽量なループ（`docker/backup-push.sh`）がUptime Kuma本体とは別プロセスとして動き、起動直後 + 以後24時間ごとにSQLiteデータベースをVPSへ push する。
+Render無料プランは永続ディスクが無いため、コンテナ内の軽量なループ（`docker/backup-push.sh`）がUptime Kuma本体とは別プロセスとして動き、起動直後（DBファイル作成を最大5分待機） + 以後24時間ごとにSQLiteデータベースをVPSへ push する。また、コンテナ起動時にDBファイルが存在しない場合（＝再デプロイ等でまっさらな状態）、`docker/entrypoint-wrapper.sh` がVPSから最新バックアップを自動取得して復元してから本体を起動する。
 
 ```
-Uptime Kuma コンテナ
+Uptime Kuma コンテナ起動
+  ├─ entrypoint-wrapper.sh
+  │    DBファイルが無ければ、VPSから最新バックアップをGETで取得して復元
   ├─ 本来のUptime Kumaプロセス（無変更）
   └─ backup-push.sh（追加の軽量ループ）
+       起動直後 + 以後24時間ごと:
        sqlite3 .backup で安全にスナップショットを取得
        → curl で https://gucchii.com/internal/uptime-kuma-backup へPOST（Bearerトークン認証）
 ```
 
-VPS側（`m-guchi/vps` リポジトリの `uptime-kuma-backup-receiver.js`）が受け取り、`/var/backups/uptime-kuma/` に保存（7日保持）し、Signalyへ成功/失敗を通知する。
+VPS側（`m-guchi/vps` リポジトリの `uptime-kuma-backup-receiver.js`）が同じエンドポイントでPOST（保存）とGET（最新バックアップの返却）の両方を受け持つ。保存は`/var/backups/uptime-kuma/`に7日保持し、Signalyへ成功/失敗を通知する。
+
+これにより、再デプロイ・再起動が発生しても直近のバックアップ時点まで自動的に復元され、管理者アカウントの再作成を求められることが無くなる（最大で`BACKUP_INTERVAL_SECONDS`分のデータが失われる可能性はある）。
 
 ### Renderで設定が必要な環境変数
 

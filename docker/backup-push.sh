@@ -22,7 +22,7 @@ do_backup() {
         return 0
     fi
 
-    if curl -fsS -X POST \
+    if curl -fsS -X POST --max-time 60 \
         -H "Authorization: Bearer $BACKUP_UPLOAD_TOKEN" \
         --data-binary "@$tmpfile" \
         "$BACKUP_UPLOAD_URL" > /dev/null; then
@@ -34,7 +34,17 @@ do_backup() {
     rm -f "$tmpfile"
 }
 
+wait_for_db() {
+    max_wait=300
+    waited=0
+    while [ ! -f "$DB_PATH" ] && [ "$waited" -lt "$max_wait" ]; do
+        sleep 5
+        waited=$((waited + 5))
+    done
+}
+
 while true; do
+    wait_for_db
     do_backup
     sleep "$INTERVAL"
 done
