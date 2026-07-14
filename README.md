@@ -92,7 +92,15 @@ Webhook通知の **Request Body** で `Custom Body` を選ぶと、[Liquid](http
 {%- capture monitorName -%}{% if monitorJSON %}{{ monitorJSON['name'] }}{% endif %}{%- endcapture -%}
 {%- capture hostText -%}{% if monitorJSON %}{{ monitorJSON['url'] | default: monitorJSON['hostname'] }}{% endif %}{%- endcapture -%}
 {%- capture pingText -%}{% if heartbeatJSON and heartbeatJSON['ping'] %}{{ heartbeatJSON['ping'] }} ms{% endif %}{%- endcapture -%}
-{%- capture dateText -%}{% if heartbeatJSON %}{{ heartbeatJSON['localDateTime'] | default: heartbeatJSON['time'] }}{% endif %}{%- endcapture -%}
+{%- capture dateText -%}
+{%- if heartbeatJSON -%}
+  {%- if heartbeatJSON['localDateTime'] -%}
+    {{ heartbeatJSON['localDateTime'] }}
+  {%- else -%}
+    {{ heartbeatJSON['time'] }} UTC
+  {%- endif -%}
+{%- endif -%}
+{%- endcapture -%}
 {%- capture title -%}{{ statusText }} {{ monitorName }}{%- endcapture -%}
 {
   "embeds": [

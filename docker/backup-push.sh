@@ -34,7 +34,7 @@ do_backup() {
     if [ "$curl_exit" -ne 0 ]; then
         echo "[backup-push] アップロード失敗（curl exit=$curl_exit）: $body"
     elif [ "$http_code" = "200" ]; then
-        echo "[backup-push] アップロード成功: $(date -Is)"
+        echo "[backup-push] アップロード成功: $(date -u -Iseconds) UTC"
     else
         echo "[backup-push] アップロード失敗（HTTP $http_code）: $body"
     fi
